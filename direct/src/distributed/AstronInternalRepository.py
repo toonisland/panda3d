@@ -77,7 +77,7 @@ def msgpack_encode(dg, element):
         # Logstash bundles a MsgPack implementation SO OLD that this isn't
         # handled correctly so this function avoids it too
         msgpack_length(dg, len(element), 0xa0, 0x20, None, 0xda, 0xdb)
-        dg.appendData(element.encode())
+        dg.appendData(element.encode('utf-8'))
     elif isinstance(element, float):
         # Python does not distinguish between floats and doubles, so we send
         # everything as a double in MsgPack:
