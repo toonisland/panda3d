@@ -4,8 +4,6 @@ See the :ref:`distribution` section of the programming manual for information
 on how to use these commands.
 """
 
-from __future__ import print_function
-
 import collections
 import os
 import plistlib
@@ -31,9 +29,6 @@ import panda3d.core as p3d
 
 
 if sys.version_info < (3, 0):
-    # Python 3 defines these subtypes of IOError, but Python 2 doesn't.
-    FileNotFoundError = IOError
-
     # Warn the user.  They might be using Python 2 by accident.
     print("=================================================================")
     print("WARNING: You are using Python 2, which has reached the end of its")
@@ -623,12 +618,16 @@ class build_apps(setuptools.Command):
                     rootdir = wf.split(os.path.sep, 1)[0]
                     search_path.append(os.path.join(whl, rootdir, '.libs'))
 
+                    # Also look for eg. numpy.libs or Pillow.libs in the root
+                    whl_name = os.path.basename(whl).split('-', 1)[0]
+                    search_path.append(os.path.join(whl, whl_name + '.libs'))
+
                     # Also look for more specific per-package cases, defined in
                     # PACKAGE_LIB_DIRS at the top of this file.
-                    whl_name = os.path.basename(whl).split('-', 1)[0]
                     extra_dirs = PACKAGE_LIB_DIRS.get(whl_name, [])
                     for extra_dir in extra_dirs:
                         search_path.append(os.path.join(whl, extra_dir.replace('/', os.path.sep)))
+
             return search_path
 
         def create_runtime(appname, mainscript, use_console):
