@@ -103,7 +103,7 @@ class NetMessenger(Messenger):
             return
 
         message = self.__type2message[msgType]
-        sentArgs=loads(di.getString())
+        sentArgs=loads(di.getBlob())
 
         if type(sentArgs) != list:
             self.notify.warning('Received non-list item in %s message: %r' %
