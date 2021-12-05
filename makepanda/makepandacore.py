@@ -28,7 +28,7 @@ SUFFIX_LIB = [".lib",".ilb"]
 VCS_DIRS = set(["CVS", "CVSROOT", ".git", ".hg", "__pycache__"])
 VCS_FILES = set([".cvsignore", ".gitignore", ".gitmodules", ".hgignore"])
 STARTTIME = time.time()
-MAINTHREAD = threading.currentThread()
+MAINTHREAD = threading.current_thread()
 OUTPUTDIR = "built"
 CUSTOM_OUTPUTDIR = False
 THIRDPARTYBASE = None
@@ -242,7 +242,7 @@ def ProgressOutput(progress, msg, target = None):
     sys.stdout.flush()
     sys.stderr.flush()
     prefix = ""
-    thisthread = threading.currentThread()
+    thisthread = threading.current_thread()
     if thisthread is MAINTHREAD:
         if progress is None:
             prefix = ""
@@ -272,7 +272,7 @@ def ProgressOutput(progress, msg, target = None):
 def exit(msg = ""):
     sys.stdout.flush()
     sys.stderr.flush()
-    if threading.currentThread() == MAINTHREAD:
+    if threading.current_thread() == MAINTHREAD:
         SaveDependencyCache()
         print("Elapsed Time: " + PrettyTime(time.time() - STARTTIME))
         print(msg)
@@ -404,8 +404,8 @@ def SetTarget(target, arch=None):
             # 64-bit platforms were introduced in Android 21.
             ANDROID_API = 21
         else:
-            # Default to the lowest API level supported by NDK r16.
-            ANDROID_API = 14
+            # Default to the lowest API level still supported by Google.
+            ANDROID_API = 19
 
         # Determine the prefix for our gcc tools, eg. arm-linux-androideabi-gcc
         global ANDROID_ABI, ANDROID_TRIPLE
@@ -433,6 +433,7 @@ def SetTarget(target, arch=None):
         else:
             exit('Android architecture must be arm, armv7a, aarch64, mips, mips64, x86 or x86_64')
 
+        ANDROID_TRIPLE += str(ANDROID_API)
         TOOLCHAIN_PREFIX = ANDROID_TRIPLE + '-'
 
     elif target == 'linux':
@@ -1556,8 +1557,8 @@ def PkgConfigGetIncDirs(pkgname, tool = "pkg-config"):
     else:
         handle = os.popen(LocateBinary(tool) + " --cflags")
     result = handle.read().strip()
-    if len(result) == 0: return []
     handle.close()
+    if len(result) == 0: return []
     dirs = []
     for opt in result.split(" "):
         if (opt.startswith("-I")):
@@ -2544,15 +2545,6 @@ def SdkLocateAndroid():
     SDK["SYSROOT"] = os.path.join(ndk_root, 'platforms', 'android-%s' % (api), arch_dir).replace('\\', '/')
     #IncDirectory("ALWAYS", os.path.join(SDK["SYSROOT"], 'usr', 'include'))
 
-    # Starting with NDK r16, libc++ is the recommended STL to use.
-    stdlibc = os.path.join(ndk_root, 'sources', 'cxx-stl', 'llvm-libc++')
-    IncDirectory("ALWAYS", os.path.join(stdlibc, 'include').replace('\\', '/'))
-    LibDirectory("ALWAYS", os.path.join(stdlibc, 'libs', abi).replace('\\', '/'))
-
-    stl_lib = os.path.join(stdlibc, 'libs', abi, 'libc++_shared.so')
-    LibName("ALWAYS", stl_lib.replace('\\', '/'))
-    CopyFile(os.path.join(GetOutputDir(), 'lib', 'libc++_shared.so'), stl_lib)
-
     # The Android support library polyfills C++ features not available in the
     # STL that ships with Android.
     support = os.path.join(ndk_root, 'sources', 'android', 'support', 'include')
@@ -2773,7 +2765,7 @@ def SetupVisualStudioEnviron():
         elif not win_kit.endswith('\\'):
             win_kit += '\\'
 
-        for vnum in 10150, 10240, 10586, 14393, 15063, 16299, 17134, 17763, 18362:
+        for vnum in 10150, 10240, 10586, 14393, 15063, 16299, 17134, 17763, 18362, 19041:
             version = "10.0.{0}.0".format(vnum)
             if os.path.isfile(win_kit + "Include\\" + version + "\\ucrt\\assert.h"):
                 print("Using Universal CRT %s" % (version))
@@ -2961,12 +2953,7 @@ def SetupBuildEnvironment(compiler):
 
         # Now extract the preprocessor's include directories.
         cmd = GetCXX() + " -x c++ -v -E " + os.devnull
-        if "ANDROID_NDK" in SDK:
-            ndk_dir = SDK["ANDROID_NDK"].replace('\\', '/')
-            cmd += ' -isystem %s/sysroot/usr/include' % (ndk_dir)
-            cmd += ' -isystem %s/sysroot/usr/include/%s' % (ndk_dir, SDK["ANDROID_TRIPLE"])
-        else:
-            cmd += sysroot_flag
+        cmd += sysroot_flag
 
         null = open(os.devnull, 'w')
         handle = subprocess.Popen(cmd, stdout=null, stderr=subprocess.PIPE, shell=True)
@@ -3108,12 +3095,15 @@ def CopyAllHeaders(dir, skip=[]):
             WriteBinaryFile(dstfile, ReadBinaryFile(srcfile))
             JustBuilt([dstfile], [srcfile])
 
-def CopyTree(dstdir, srcdir, omitVCS=True):
+def CopyTree(dstdir, srcdir, omitVCS=True, exclude=()):
     if os.path.isdir(dstdir):
         source_entries = os.listdir(srcdir)
         for entry in source_entries:
             srcpth = os.path.join(srcdir, entry)
             dstpth = os.path.join(dstdir, entry)
+
+            if entry in exclude:
+                continue
 
             if os.path.islink(srcpth) or os.path.isfile(srcpth):
                 if not omitVCS or entry not in VCS_FILES:
@@ -3124,7 +3114,7 @@ def CopyTree(dstdir, srcdir, omitVCS=True):
 
         # Delete files in dstdir that are not in srcdir.
         for entry in os.listdir(dstdir):
-            if entry not in source_entries:
+            if entry not in source_entries or entry in exclude:
                 path = os.path.join(dstdir, entry)
                 if os.path.islink(path) or os.path.isfile(path):
                     os.remove(path)
@@ -3139,6 +3129,13 @@ def CopyTree(dstdir, srcdir, omitVCS=True):
         else:
             if subprocess.call(['cp', '-R', '-f', srcdir, dstdir]) != 0:
                 exit("Copy failed.")
+
+        for entry in exclude:
+            path = os.path.join(dstdir, entry)
+            if os.path.islink(path) or os.path.isfile(path):
+                os.remove(path)
+            elif os.path.isdir(path):
+                shutil.rmtree(path)
 
         if omitVCS:
             DeleteVCS(dstdir)
@@ -3270,6 +3267,22 @@ def WriteResourceFile(basename, **kwargs):
     return basename
 
 
+def GenerateEmbeddedStringFile(string_name, data):
+    yield 'extern const char %s[] = {\n' % (string_name)
+    i = 0
+    for byte in data:
+        if i == 0:
+            yield ' '
+
+        yield ' 0x%02x,' % (byte)
+        i += 1
+        if i >= 12:
+            yield '\n'
+            i = 0
+
+    yield '\n};\n'
+
+
 def WriteEmbeddedStringFile(basename, inputs, string_name=None):
     if os.path.splitext(basename)[1] not in SUFFIX_INC:
         basename += '.cxx'
@@ -3294,20 +3307,7 @@ def WriteEmbeddedStringFile(basename, inputs, string_name=None):
 
     data.append(0)
 
-    output = 'extern const char %s[] = {\n' % (string_name)
-
-    i = 0
-    for byte in data:
-        if i == 0:
-            output += ' '
-
-        output += ' 0x%02x,' % (byte)
-        i += 1
-        if i >= 12:
-            output += '\n'
-            i = 0
-
-    output += '\n};\n'
+    output = ''.join(GenerateEmbeddedStringFile(string_name, data))
     ConditionalWriteFile(target, output)
     return target
 
@@ -3478,7 +3478,8 @@ def UpdatePythonVersionInfoFile(new_info):
     json_data = []
     if os.path.isfile(json_file) and not PkgSkip("PYTHON"):
         try:
-            json_data = json.load(open(json_file, 'r'))
+            with open(json_file, 'r') as fh:
+                json_data = json.load(fh)
         except:
             json_data = []
 
@@ -3498,7 +3499,9 @@ def UpdatePythonVersionInfoFile(new_info):
 
     if VERBOSE:
         print("Writing %s" % (json_file))
-    json.dump(json_data, open(json_file, 'w'), indent=4)
+
+    with open(json_file, 'w') as fh:
+        json.dump(json_data, fh, indent=4)
 
 
 def ReadPythonVersionInfoFile():
