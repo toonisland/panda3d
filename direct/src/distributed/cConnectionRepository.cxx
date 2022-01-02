@@ -303,61 +303,43 @@ check_datagram() {
       return true;
     }
 
-    // FIXME: This is despicable...
-    // There must be a better way of doing
-    // this...
-    if (astron_support) { // Astron
-      switch (_msg_type) {
+    unsigned int client_update_msg;
+    unsigned int stateserver_update_msg;
+    if (astron_support)
+    {
+      client_update_msg = CLIENT_OBJECT_SET_FIELD;
+      stateserver_update_msg = STATESERVER_OBJECT_SET_FIELD;
+    }
+    else
+    {
+      client_update_msg = CLIENT_OBJECT_UPDATE_FIELD;
+      stateserver_update_msg = STATESERVER_OBJECT_UPDATE_FIELD;
+    }
+
+    switch (_msg_type) {
 #ifdef HAVE_PYTHON
-      case CLIENT_OBJECT_SET_FIELD:
-      case STATESERVER_OBJECT_SET_FIELD:
-        if (_handle_c_updates) {
-          if (_has_owner_view) {
-            if (!handle_update_field_owner()) {
-              return false;
-            }
-          } else {
-            if (!handle_update_field()) {
-              return false;
-            }
+    case client_update_msg:
+    case stateserver_update_msg:
+      if (_handle_c_updates) {
+        if (_has_owner_view) {
+          if (!handle_update_field_owner()) {
+            return false;
           }
         } else {
-          // Let the caller (Python) deal with this update.
-          return true;
-        }
-        break;
-#endif  // HAVE_PYTHON
-
-      default:
-        // Some unknown message; let the caller deal with it.
-        return true;
-      }
-    } else { // OTP
-      switch (_msg_type) {
-#ifdef HAVE_PYTHON
-      case CLIENT_OBJECT_UPDATE_FIELD:
-      case STATESERVER_OBJECT_UPDATE_FIELD:
-        if (_handle_c_updates) {
-          if (_has_owner_view) {
-            if (!handle_update_field_owner()) {
-              return false;
-            }
-          } else {
-            if (!handle_update_field()) {
-              return false;
-            }
+          if (!handle_update_field()) {
+            return false;
           }
-        } else {
-          // Let the caller (Python) deal with this update.
-          return true;
         }
-        break;
-#endif  // HAVE_PYTHON
-
-      default:
-        // Some unknown message; let the caller deal with it.
+      } else {
+        // Let the caller (Python) deal with this update.
         return true;
       }
+      break;
+#endif  // HAVE_PYTHON
+
+    default:
+      // Some unknown message; let the caller deal with it.
+      return true;
     }
   }
 
@@ -522,7 +504,10 @@ send_message_bundle(unsigned int channel, unsigned int sender_channel) {
     dg.add_int8(1);
     dg.add_uint64(channel);
     dg.add_uint64(sender_channel);
-    //dg.add_uint16(STATESERVER_BOUNCE_MESSAGE);
+    if (!astron_support)
+    {
+      dg.add_uint16(STATESERVER_BOUNCE_MESSAGE);
+    }
     // add each bundled message
     BundledMsgVector::const_iterator bmi;
     for (bmi = _bundle_msgs.begin(); bmi != _bundle_msgs.end(); bmi++) {
@@ -930,17 +915,23 @@ describe_message(std::ostream &out, const string &prefix,
 
     packer.RAW_UNPACK_CHANNEL();  // msg_sender
     msg_type = packer.raw_unpack_uint16();
-    if (astron_support) {
+    if (astron_support)
+    {
       is_update = (msg_type == STATESERVER_OBJECT_SET_FIELD);
-    } else {
+    }
+    else
+    {
       is_update = (msg_type == STATESERVER_OBJECT_UPDATE_FIELD);
     }
 
   } else {
     msg_type = packer.raw_unpack_uint16();
-    if (astron_support) {
+    if (astron_support)
+    {
       is_update = (msg_type == CLIENT_OBJECT_SET_FIELD);
-    } else {
+    }
+    else
+    {
       is_update = (msg_type == CLIENT_OBJECT_UPDATE_FIELD);
     }
   }

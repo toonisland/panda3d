@@ -3,6 +3,8 @@ by the CMU ServerRepository/ClientRepository code in this directory.
 It replaces the MsgTypes module, which is not used by the CMU
 implementation. """
 
+from panda3d.core import ConfigVariableBool
+
 from direct.showbase.PythonUtil import invertDictLossless
 
 MsgName2Id = {
@@ -18,9 +20,12 @@ MsgName2Id = {
     'OBJECT_SET_ZONE_CMU'                     : 9010,
     'CLIENT_HEARTBEAT_CMU'                    : 9011,
     'CLIENT_OBJECT_UPDATE_FIELD_TARGETED_CMU'  : 9011,
-
-    'CLIENT_OBJECT_UPDATE_FIELD' : 120,  # Matches MsgTypes.CLIENT_OBJECT_SET_FIELD
     }
+
+if ConfigVariableBool('astron-support', True):
+    MsgName2Id['CLIENT_OBJECT_UPDATE_FIELD'] = 120  # Matches MsgTypes.CLIENT_OBJECT_SET_FIELD
+else:
+    MsgName2Id['CLIENT_OBJECT_UPDATE_FIELD'] = 24  # Matches MsgTypes.CLIENT_OBJECT_UPDATE_FIELD
 
 # create id->name table for debugging
 MsgId2Names = invertDictLossless(MsgName2Id)
