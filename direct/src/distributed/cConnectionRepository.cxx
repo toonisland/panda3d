@@ -303,23 +303,12 @@ check_datagram() {
       return true;
     }
 
-    unsigned int client_update_msg;
-    unsigned int stateserver_update_msg;
-    if (astron_support)
-    {
-      client_update_msg = CLIENT_OBJECT_SET_FIELD;
-      stateserver_update_msg = STATESERVER_OBJECT_SET_FIELD;
-    }
-    else
-    {
-      client_update_msg = CLIENT_OBJECT_UPDATE_FIELD;
-      stateserver_update_msg = STATESERVER_OBJECT_UPDATE_FIELD;
-    }
-
     switch (_msg_type) {
 #ifdef HAVE_PYTHON
-    case client_update_msg:
-    case stateserver_update_msg:
+    case CLIENT_OBJECT_SET_FIELD:
+    case CLIENT_OBJECT_UPDATE_FIELD:
+    case STATESERVER_OBJECT_SET_FIELD:
+    case STATESERVER_OBJECT_UPDATE_FIELD:
       if (_handle_c_updates) {
         if (_has_owner_view) {
           if (!handle_update_field_owner()) {
