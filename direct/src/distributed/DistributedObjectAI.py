@@ -144,6 +144,9 @@ class DistributedObjectAI(DistributedObjectBase):
                     barrier.cleanup()
                 self.__barriers = {}
 
+                if not ConfigVariableBool('astron-support', True):
+                    self.air.stopTrackRequestDeletedDO(self)
+
                 # DCR: I've re-enabled this block of code so that Toontown's
                 # AI won't leak channels.
                 # Let me know if it causes trouble.
@@ -151,9 +154,15 @@ class DistributedObjectAI(DistributedObjectBase):
                 ### block until a solution is thought out of how to prevent
                 ### this delete message or to handle this message better
                 # TODO: do we still need this check?
-                if not getattr(self, "doNotDeallocateChannel", False):
-                    if self.air:
-                        self.air.deallocateChannel(self.doId)
+                if ConfigVariableBool('astron-support', True):
+                    if not getattr(self, "doNotDeallocateChannel", False):
+                        if self.air:
+                            self.air.deallocateChannel(self.doId)
+                else:
+                    if not hasattr(self, "doNotDeallocateChannel"):
+                        if self.air and not hasattr(self.air, "doNotDeallocateChannel"):
+                            if self.air.minChannel <= self.doId <= self.air.maxChannel:
+                                self.air.deallocateChannel(self.doId)
                 self.air = None
 
                 self.parentId = None
@@ -193,6 +202,10 @@ class DistributedObjectAI(DistributedObjectBase):
         Called after the object has been generated and all
         of its required fields filled in. Overwrite when needed.
         """
+
+    if not ConfigVariableBool('astron-support', True):
+        def addInterest(self, zoneId, note="", event=None):
+            self.air.addInterest(self.doId, zoneId, note, event)
 
     def b_setLocation(self, parentId, zoneId):
         self.d_setLocation(parentId, zoneId)
@@ -263,6 +276,10 @@ class DistributedObjectAI(DistributedObjectBase):
         self.postGenerateMessage()
 
         dclass.receiveUpdateOther(self, di)
+
+    if not ConfigVariableBool('astron-support', True):
+        def sendSetZone(self, zoneId):
+            self.air.sendSetZone(self, zoneId)
 
     def startMessageBundle(self, name):
         self.air.startMessageBundle(name)
@@ -336,10 +353,16 @@ class DistributedObjectAI(DistributedObjectBase):
             self.air.sendUpdate(self, fieldName, args)
 
     def GetPuppetConnectionChannel(self, doId):
-        return doId + (1001 << 32)
+        if ConfigVariableBool('astron-support', True):
+            return doId + (1001 << 32)
+        else:
+            return doId + (1 << 32)
 
     def GetAccountConnectionChannel(self, doId):
-        return doId + (1003 << 32)
+        if ConfigVariableBool('astron-support', True):
+            return doId + (1003 << 32)
+        else:
+            return doId + (3 << 32)
 
     def GetAccountIDFromChannelCode(self, channel):
         return channel >> 32
@@ -469,6 +492,8 @@ class DistributedObjectAI(DistributedObjectBase):
                 (self.__class__, doId))
             return
         self.air.requestDelete(self)
+        if not ConfigVariableBool('astron-support', True):
+            self.air.startTrackRequestDeletedDO(self)
         self._DOAI_requestedDelete = True
 
     def taskName(self, taskString):
@@ -566,5 +591,6 @@ class DistributedObjectAI(DistributedObjectBase):
     def _retrieveCachedData(self):
         """ This is a no-op on the AI. """
 
-    def setAI(self, aiChannel):
-        self.air.setAI(self.doId, aiChannel)
+    if ConfigVariableBool('astron-support', True):
+        def setAI(self, aiChannel):
+            self.air.setAI(self.doId, aiChannel)
