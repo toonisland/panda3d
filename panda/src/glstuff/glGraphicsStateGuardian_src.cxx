@@ -4522,7 +4522,7 @@ end_frame_timing(const FrameTiming &frame) {
 
   // The end time of the last collector is implicitly the frame's end time.
   frame_data.add_stop(0, frame_data.get_end());
-  gpu_thread.add_frame(frame._frame_number, frame_data);
+  gpu_thread.add_frame(frame._frame_number, std::move(frame_data));
 
   _timer_queries_pcollector.add_level_now(frame._queries.size());
 #endif
@@ -12078,7 +12078,21 @@ set_state_and_transform(const RenderState *target,
   if (_target_rs->get_attrib(texture_slot) != _state_rs->get_attrib(texture_slot) ||
       !_state_mask.get_bit(texture_slot)) {
     //PStatGPUTimer timer(this, _draw_set_state_texture_pcollector);
+#ifdef OPENGLES_1
     determine_target_texture();
+#else
+    if (has_fixed_function_pipeline() ||
+        _current_shader == nullptr ||
+        _current_shader == _default_shader) {
+      determine_target_texture();
+    } else {
+      // If we have a custom shader, don't filter down the list of textures.
+      _target_texture = (const TextureAttrib *)
+        _target_rs->get_attrib_def(TextureAttrib::get_class_slot());
+      _target_tex_gen = (const TexGenAttrib *)
+        _target_rs->get_attrib_def(TexGenAttrib::get_class_slot());
+    }
+#endif
     do_issue_texture();
 
     // Since the TexGen and TexMatrix states depend partly on the particular
@@ -14242,7 +14256,8 @@ upload_texture_image(CLP(TextureContext) *gtc, bool needs_reload,
           size_t page_size = tex->get_ram_mipmap_page_size(n);
           for (int z = 0; z < 6; ++z) {
             GLenum page_target = GL_TEXTURE_CUBE_MAP_POSITIVE_X + z;
-            const unsigned char *page_ptr = image_ptr + page_size * z;
+            const unsigned char *page_ptr =
+              (image_ptr != nullptr) ? image_ptr + page_size * z : nullptr;
 
             if (image_compression == Texture::CM_off) {
               glTexImage2D(page_target, n - mipmap_bias, internal_format,
@@ -14935,6 +14950,7 @@ do_extract_texture_data(CLP(TextureContext) *gtc) {
     break;
   case GL_LUMINANCE:
 #ifndef OPENGLES
+  case GL_LUMINANCE8_EXT:
   case GL_LUMINANCE16:
   case GL_LUMINANCE16F_ARB:
 #endif
