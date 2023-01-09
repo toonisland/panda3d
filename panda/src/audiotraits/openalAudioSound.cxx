@@ -99,10 +99,10 @@ OpenALAudioSound::
  */
 void OpenALAudioSound::
 cleanup() {
-  ReMutexHolder holder(OpenALAudioManager::_lock);
   if (!is_valid()) {
     return;
   }
+  ReMutexHolder holder(OpenALAudioManager::_lock);
   if (is_playing()) {
     stop();
   }
