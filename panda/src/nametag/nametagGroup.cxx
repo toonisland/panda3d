@@ -312,6 +312,7 @@ set_chat(const std::string &chat, int chat_flags, int page_number) {
     // Chat flags 0, or empty chat message: no chat message.
     _chat_pages.clear();
     _chat_flags = 0;
+    _chat_stomp_accum = 0;
 
   } 
   else {
