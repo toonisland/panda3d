@@ -185,16 +185,16 @@ static const string default_vshader =
 #endif
   "in vec4 p3d_Vertex;\n"
   "in vec4 p3d_Color;\n"
-  "in vec2 p3d_MultiTexCoord0;\n"
-  "out vec2 texcoord;\n"
+  "in vec4 p3d_MultiTexCoord0;\n"
+  "out vec3 texcoord;\n"
   "out vec4 color;\n"
 #else
   "#version 100\n"
   "precision mediump float;\n"
   "attribute vec4 p3d_Vertex;\n"
   "attribute vec4 p3d_Color;\n"
-  "attribute vec2 p3d_MultiTexCoord0;\n"
-  "varying vec2 texcoord;\n"
+  "attribute vec4 p3d_MultiTexCoord0;\n"
+  "varying vec3 texcoord;\n"
   "varying lowp vec4 color;\n"
 #endif
   "uniform mat4 p3d_ModelViewProjectionMatrix;\n"
@@ -202,7 +202,7 @@ static const string default_vshader =
   "uniform vec4 p3d_ColorScale;\n"
   "void main(void) {\n"
   "  gl_Position = p3d_ModelViewProjectionMatrix * p3d_Vertex;\n"
-  "  texcoord = (p3d_TextureMatrix * vec4(p3d_MultiTexCoord0.x, p3d_MultiTexCoord0.y, 0, 1)).xy;\n"
+  "  texcoord = (p3d_TextureMatrix * p3d_MultiTexCoord0).xyw;\n"
   "  color = p3d_Color * p3d_ColorScale;\n"
   "}\n";
 
@@ -218,8 +218,8 @@ static const string default_vshader_fp64 =
   "#extension GL_ARB_gpu_shader_fp64 : require\n"
   "in dvec3 p3d_Vertex;\n"
   "in vec4 p3d_Color;\n"
-  "in dvec2 p3d_MultiTexCoord0;\n"
-  "out vec2 texcoord;\n"
+  "in dvec4 p3d_MultiTexCoord0;\n"
+  "out vec3 texcoord;\n"
   "out vec4 color;\n"
   "uniform mat4 p3d_ModelViewMatrix;\n"
   "uniform mat4 p3d_ProjectionMatrix;\n"
@@ -227,7 +227,7 @@ static const string default_vshader_fp64 =
   "uniform vec4 p3d_ColorScale;\n"
   "void main(void) {\n" // Apply proj & modelview in two steps, more precise
   "  gl_Position = vec4(dmat4(p3d_ProjectionMatrix) * (dmat4(p3d_ModelViewMatrix) * dvec4(p3d_Vertex, 1)));\n"
-  "  texcoord = (p3d_TextureMatrix * vec4(p3d_MultiTexCoord0.x, p3d_MultiTexCoord0.y, 0, 1)).xy;\n"
+  "  texcoord = (p3d_TextureMatrix * vec4(p3d_MultiTexCoord0)).xyw;\n"
   "  color = p3d_Color * p3d_ColorScale;\n"
   "}\n";
 
@@ -236,8 +236,8 @@ static const string default_vshader_fp64_gl41 =
   "#version 410\n"
   "in dvec3 p3d_Vertex;\n"
   "in vec4 p3d_Color;\n"
-  "in dvec2 p3d_MultiTexCoord0;\n"
-  "out vec2 texcoord;\n"
+  "in dvec4 p3d_MultiTexCoord0;\n"
+  "out vec3 texcoord;\n"
   "out vec4 color;\n"
   "uniform mat4 p3d_ModelViewMatrix;\n"
   "uniform mat4 p3d_ProjectionMatrix;\n"
@@ -245,7 +245,7 @@ static const string default_vshader_fp64_gl41 =
   "uniform vec4 p3d_ColorScale;\n"
   "void main(void) {\n" // Apply proj & modelview in two steps, more precise
   "  gl_Position = vec4(dmat4(p3d_ProjectionMatrix) * (dmat4(p3d_ModelViewMatrix) * dvec4(p3d_Vertex, 1)));\n"
-  "  texcoord = (p3d_TextureMatrix * vec4(p3d_MultiTexCoord0.x, p3d_MultiTexCoord0.y, 0, 1)).xy;\n"
+  "  texcoord = (p3d_TextureMatrix * vec4(p3d_MultiTexCoord0)).xyw;\n"
   "  color = p3d_Color * p3d_ColorScale;\n"
   "}\n";
 #endif
@@ -257,7 +257,7 @@ static const string default_fshader =
 #else
   "#version 130\n"
 #endif
-  "in vec2 texcoord;\n"
+  "in vec3 texcoord;\n"
   "in vec4 color;\n"
   "out vec4 p3d_FragColor;\n"
   "uniform sampler2D p3d_Texture0;\n"
@@ -265,18 +265,18 @@ static const string default_fshader =
 #else
   "#version 100\n"
   "precision mediump float;\n"
-  "varying vec2 texcoord;\n"
+  "varying vec3 texcoord;\n"
   "varying lowp vec4 color;\n"
   "uniform lowp sampler2D p3d_Texture0;\n"
   "uniform lowp vec4 p3d_TexAlphaOnly;\n"
 #endif
   "void main(void) {\n"
 #ifndef OPENGLES
-  "  p3d_FragColor = texture(p3d_Texture0, texcoord);\n"
+  "  p3d_FragColor = textureProj(p3d_Texture0, texcoord);\n"
   "  p3d_FragColor += p3d_TexAlphaOnly;\n" // Hack for text rendering
   "  p3d_FragColor *= color;\n"
 #else
-  "  gl_FragColor = texture2D(p3d_Texture0, texcoord);\n"
+  "  gl_FragColor = texture2DProj(p3d_Texture0, texcoord);\n"
   "  gl_FragColor += p3d_TexAlphaOnly;\n" // Hack for text rendering
   "  gl_FragColor *= color;\n"
 #endif
@@ -12340,6 +12340,8 @@ set_state_and_transform(const RenderState *target,
   }
 
   int texture_slot = TextureAttrib::get_class_slot();
+  int tex_gen_slot = TexGenAttrib::get_class_slot();
+  int tex_matrix_slot = TexMatrixAttrib::get_class_slot();
   if (_target_rs->get_attrib(texture_slot) != _state_rs->get_attrib(texture_slot) ||
       !_state_mask.get_bit(texture_slot)) {
     //PStatGPUTimer timer(this, _draw_set_state_texture_pcollector);
@@ -12355,7 +12357,7 @@ set_state_and_transform(const RenderState *target,
       _target_texture = (const TextureAttrib *)
         _target_rs->get_attrib_def(TextureAttrib::get_class_slot());
       _target_tex_gen = (const TexGenAttrib *)
-        _target_rs->get_attrib_def(TexGenAttrib::get_class_slot());
+        _target_rs->get_attrib_def(tex_gen_slot);
     }
 #endif
     do_issue_texture();
@@ -12363,28 +12365,36 @@ set_state_and_transform(const RenderState *target,
     // Since the TexGen and TexMatrix states depend partly on the particular
     // set of textures in use, we should force both of those to be reissued
     // every time we change the texture state.
-    _state_mask.clear_bit(TexGenAttrib::get_class_slot());
-    _state_mask.clear_bit(TexMatrixAttrib::get_class_slot());
+    _state_mask.clear_bit(tex_gen_slot);
+    _state_mask.clear_bit(tex_matrix_slot);
 
     _state_texture = _target_texture;
     _state_mask.set_bit(texture_slot);
   }
+  else if (_target_rs->get_attrib(tex_gen_slot) != _state_rs->get_attrib(tex_gen_slot) ||
+           !_state_mask.get_bit(tex_gen_slot)) {
+    _target_tex_gen = (const TexGenAttrib *)_target_rs->get_attrib_def(tex_gen_slot);
 
-  // If one of the previously-loaded TexGen modes modified the texture matrix,
-  // then if either state changed, we have to change both of them now.
-  if (_tex_gen_modifies_mat) {
-    int tex_gen_slot = TexGenAttrib::get_class_slot();
-    int tex_matrix_slot = TexMatrixAttrib::get_class_slot();
-    if (_target_rs->get_attrib(tex_gen_slot) != _state_rs->get_attrib(tex_gen_slot) ||
-        _target_rs->get_attrib(tex_matrix_slot) != _state_rs->get_attrib(tex_matrix_slot) ||
-        !_state_mask.get_bit(tex_gen_slot) ||
-        !_state_mask.get_bit(tex_matrix_slot)) {
+#ifdef SUPPORT_FIXED_FUNCTION
+#ifdef OPENGLES_1
+    if (_has_texture_alpha_scale) {
+#else
+    if (_has_texture_alpha_scale && _current_shader == nullptr) {
+#endif
+      PT(TextureStage) stage = get_alpha_scale_texture_stage();
+      _target_tex_gen = DCAST(TexGenAttrib, _target_tex_gen->add_stage
+                              (stage, TexGenAttrib::M_constant, LTexCoord3(_current_color_scale[3], 0.0f, 0.0f)));
+    }
+#endif  // SUPPORT_FIXED_FUNCTION
+
+    // If one of the previously-loaded TexGen modes modified the texture matrix,
+    // then if either state changed, we have to change both of them now.
+    if (_tex_gen_modifies_mat) {
       _state_mask.clear_bit(tex_gen_slot);
       _state_mask.clear_bit(tex_matrix_slot);
     }
   }
 
-  int tex_matrix_slot = TexMatrixAttrib::get_class_slot();
   if (_target_rs->get_attrib(tex_matrix_slot) != _state_rs->get_attrib(tex_matrix_slot) ||
       !_state_mask.get_bit(tex_matrix_slot)) {
     // PStatGPUTimer timer(this, _draw_set_state_tex_matrix_pcollector);
@@ -12399,11 +12409,15 @@ set_state_and_transform(const RenderState *target,
       _current_shader_context->issue_parameters(Shader::SSD_tex_matrix);
     }
 #endif
+
+    // See previous occurrence of this check.
+    if (_tex_gen_modifies_mat) {
+      _state_mask.clear_bit(tex_gen_slot);
+    }
   }
 
 #ifdef SUPPORT_FIXED_FUNCTION
   if (has_fixed_function_pipeline()) {
-    int tex_gen_slot = TexGenAttrib::get_class_slot();
     if (_target_tex_gen != _state_tex_gen ||
         !_state_mask.get_bit(tex_gen_slot)) {
       // PStatGPUTimer timer(this, _draw_set_state_tex_gen_pcollector);

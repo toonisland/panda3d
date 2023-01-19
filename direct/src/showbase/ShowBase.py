@@ -487,11 +487,15 @@ class ShowBase(DirectObject.DirectObject):
             DGG.setDefaultClickSound(self.loader.loadSfx("audio/sfx/GUI_click.wav"))
             DGG.setDefaultRolloverSound(self.loader.loadSfx("audio/sfx/GUI_rollover.wav"))
 
+        # Create a private DirectObject - allowing base.accept for window-event
+        # as well as allowing ShowBase's default handling of this.
+        self.__directObject = DirectObject.DirectObject()
+
         # Now hang a hook on the window-event from Panda.  This allows
         # us to detect when the user resizes, minimizes, or closes the
         # main window.
         self.__prevWindowProperties = None
-        self.accept('window-event', self.windowEvent)
+        self.__directObject.accept('window-event', self.windowEvent)
 
         # Transition effects (fade, iris, etc)
         from . import Transitions
@@ -579,7 +583,17 @@ class ShowBase(DirectObject.DirectObject):
         exitfunc and will be called at application exit time
         automatically.
 
-        This function is designed to be safe to call multiple times."""
+        This function is designed to be safe to call multiple times.
+
+        When called from a thread other than the main thread, this will create
+        a task to schedule the destroy on the main thread, and wait for this to
+        complete.
+        """
+
+        if Thread.getCurrentThread() != Thread.getMainThread():
+            task = taskMgr.add(self.destroy, extraArgs=[])
+            task.wait()
+            return
 
         for cb in self.finalExitCallbacks[:]:
             cb()
@@ -2579,9 +2593,9 @@ class ShowBase(DirectObject.DirectObject):
             self.oobeVis.setLightOff(1)
             self.oobeCullFrustum = None
 
-            self.accept('oobe-down', self.__oobeButton, extraArgs = [''])
-            self.accept('oobe-repeat', self.__oobeButton, extraArgs = ['-repeat'])
-            self.accept('oobe-up', self.__oobeButton, extraArgs = ['-up'])
+            self.__directObject.accept('oobe-down', self.__oobeButton, extraArgs = [''])
+            self.__directObject.accept('oobe-repeat', self.__oobeButton, extraArgs = ['-repeat'])
+            self.__directObject.accept('oobe-up', self.__oobeButton, extraArgs = ['-up'])
 
         if self.oobeMode:
             # Disable OOBE mode.
@@ -3332,7 +3346,13 @@ class ShowBase(DirectObject.DirectObject):
         not running from within a p3d file.  When we *are* within a p3d
         file, the Panda3D runtime has to be responsible for running the
         main loop, so we can't allow the application to do it.
+
+        This method must be called from the main thread, otherwise an error is
+        thrown.
         """
+        if Thread.getCurrentThread() != Thread.getMainThread():
+            self.notify.error("run() must be called from the main thread.")
+            return
 
         if self.appRunner is None or self.appRunner.dummy or \
            (self.appRunner.interactiveConsole and not self.appRunner.initialAppImport):
