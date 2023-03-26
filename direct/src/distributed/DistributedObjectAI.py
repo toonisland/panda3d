@@ -1,5 +1,6 @@
 """DistributedObjectAI module: contains the DistributedObjectAI class"""
 
+from panda3d.core import ConfigVariableBool
 from direct.directnotify.DirectNotifyGlobal import directNotify
 from direct.distributed.DistributedObjectBase import DistributedObjectBase
 from direct.showbase.MessengerGlobal import messenger
