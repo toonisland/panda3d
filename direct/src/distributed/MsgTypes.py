@@ -140,7 +140,7 @@ if ConfigVariableBool('astron-support', True):
         'CLIENTAGENT_ADD_INTEREST':                     1200,
         'CLIENTAGENT_ADD_INTEREST_MULTIPLE':            1201,
         'CLIENTAGENT_REMOVE_INTEREST':                  1203,
-        }
+    }
 else:
     MsgName2Id = {
         # 2 new params: passwd, char bool 0/1 1 = new account
@@ -241,7 +241,7 @@ else:
         'STATESERVER_OBJECT_CREATE_WITH_REQUIRED_CONTEXT':     2050,
         'STATESERVER_OBJECT_CREATE_WITH_REQUIR_OTHER_CONTEXT': 2051,
         'STATESERVER_BOUNCE_MESSAGE':                          2086,
-        }
+    }
 
 # create id->name table for debugging
 MsgId2Names = invertDictLossless(MsgName2Id)
@@ -261,7 +261,7 @@ QUIET_ZONE_IGNORED_LIST = [
     #CLIENT_CREATE_OBJECT_REQUIRED,
     #CLIENT_CREATE_OBJECT_REQUIRED_OTHER,
 
-    ]
+]
 
 # The following is a different set of numbers from above.
 # These are the sub-message types for CLIENT_LOGIN_2.
