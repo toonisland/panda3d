@@ -12,7 +12,12 @@ from direct.distributed.CRDataCache import CRDataCache
 from direct.distributed.ConnectionRepository import ConnectionRepository
 from direct.showbase.PythonUtil import safeRepr, itype, makeList
 from direct.showbase.MessengerGlobal import messenger
-from .MsgTypes import CLIENT_ENTER_OBJECT_REQUIRED_OTHER, MsgId2Names
+from .MsgTypes import MsgId2Names
+if ConfigVariableBool('astron-support', True):
+    from .MsgTypes import CLIENT_ENTER_OBJECT_REQUIRED_OTHER
+else:
+    from .MsgTypes import CLIENT_CREATE_OBJECT_REQUIRED_OTHER
+
 from . import CRCache
 from . import ParentMgr
 from . import RelatedObjectMgr

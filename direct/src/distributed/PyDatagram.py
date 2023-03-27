@@ -27,7 +27,8 @@ from panda3d.direct import (
 )
 # Import the type numbers
 
-from direct.distributed.MsgTypes import CONTROL_CHANNEL
+if ConfigVariableBool('astron-support', True):
+    from direct.distributed.MsgTypes import CONTROL_CHANNEL
 
 
 class PyDatagram(Datagram):
