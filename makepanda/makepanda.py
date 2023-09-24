@@ -9,8 +9,8 @@
 ########################################################################
 
 import sys
-if sys.version_info < (3, 6):
-    print("This version of Python is not supported, use version 3.6 or higher.")
+if sys.version_info < (3, 8):
+    print("This version of Python is not supported, use version 3.8 or higher.")
     exit(1)
 
 try:
@@ -1082,6 +1082,9 @@ if (COMPILER=="GCC"):
         LibName("COCOA", "-framework Cocoa")
         # Fix for a bug in OSX Leopard:
         LibName("GL", "-dylib_file /System/Library/Frameworks/OpenGL.framework/Versions/A/Libraries/libGL.dylib:/System/Library/Frameworks/OpenGL.framework/Versions/A/Libraries/libGL.dylib")
+        # When using pre-11.0 SDKs, for PStats
+        if os.path.basename(SDK["MACOSX"]).startswith("MacOSX10."):
+            LibName("COCOA", "-Wl,-U,_OBJC_CLASS_$_NSTrackingSeparatorToolbarItem")
 
         # Temporary exceptions to removal of this flag
         if not PkgSkip("FFMPEG"):
@@ -2160,7 +2163,7 @@ def CompileBundle(target, inputs, opts):
     # Now link the object files to form the bundle.
     if plist is None:
         exit("One plist file must be used when creating a bundle!")
-    bundleName = plistlib.load(plist)["CFBundleExecutable"]
+    bundleName = plistlib.load(open(plist, 'rb'))["CFBundleExecutable"]
 
     oscmd("rm -rf %s" % target)
     oscmd("mkdir -p %s/Contents/MacOS/" % target)
@@ -3740,7 +3743,6 @@ TargetAdd('p3putil_composite2.obj', opts=OPTS, input='p3putil_composite2.cxx')
 OPTS=['DIR:panda/src/putil', 'ZLIB']
 IGATEFILES=GetDirectoryContents('panda/src/putil', ["*.h", "*_composite*.cxx"])
 IGATEFILES.remove("test_bam.h")
-IGATEFILES.remove("config_util.h")
 TargetAdd('libp3putil.in', opts=OPTS, input=IGATEFILES)
 TargetAdd('libp3putil.in', opts=['IMOD:panda3d.core', 'ILIB:libp3putil', 'SRCDIR:panda/src/putil'])
 PyTargetAdd('p3putil_ext_composite.obj', opts=OPTS, input='p3putil_ext_composite.cxx')
@@ -3851,7 +3853,6 @@ TargetAdd('p3pstatclient_composite2.obj', opts=OPTS, input='p3pstatclient_compos
 
 OPTS=['DIR:panda/src/pstatclient']
 IGATEFILES=GetDirectoryContents('panda/src/pstatclient', ["*.h", "*_composite*.cxx"])
-IGATEFILES.remove("config_pstats.h")
 TargetAdd('libp3pstatclient.in', opts=OPTS, input=IGATEFILES)
 TargetAdd('libp3pstatclient.in', opts=['IMOD:panda3d.core', 'ILIB:libp3pstatclient', 'SRCDIR:panda/src/pstatclient'])
 PyTargetAdd('p3pstatclient_pStatClient_ext.obj', opts=OPTS, input='pStatClient_ext.cxx')
@@ -6104,10 +6105,13 @@ if not PkgSkip("PANDATOOL"):
 # DIRECTORY: pandatool/src/gtk-stats/
 #
 
-if not PkgSkip("PANDATOOL") and (GetTarget() == 'windows' or not PkgSkip("GTK3")):
+if not PkgSkip("PANDATOOL") and (GetTarget() in ('windows', 'darwin') or not PkgSkip("GTK3")):
     if GetTarget() == 'windows':
         OPTS=['DIR:pandatool/src/win-stats']
         TargetAdd('pstats_composite1.obj', opts=OPTS, input='winstats_composite1.cxx')
+    elif GetTarget() == 'darwin':
+        OPTS=['DIR:pandatool/src/mac-stats']
+        TargetAdd('pstats_composite1.obj', opts=OPTS, input='macstats_composite1.mm')
     else:
         OPTS=['DIR:pandatool/src/gtk-stats', 'GTK3']
         TargetAdd('pstats_composite1.obj', opts=OPTS, input='gtkstats_composite1.cxx')
@@ -6116,7 +6120,7 @@ if not PkgSkip("PANDATOOL") and (GetTarget() == 'windows' or not PkgSkip("GTK3")
     TargetAdd('pstats.exe', input='libp3progbase.lib')
     TargetAdd('pstats.exe', input='libp3pandatoolbase.lib')
     TargetAdd('pstats.exe', input=COMMON_PANDA_LIBS)
-    TargetAdd('pstats.exe', opts=['SUBSYSTEM:WINDOWS', 'WINCOMCTL', 'WINCOMDLG', 'WINSOCK', 'WINIMM', 'WINGDI', 'WINKERNEL', 'WINOLDNAMES', 'WINUSER', 'WINMM', 'UXTHEME', 'GTK3'])
+    TargetAdd('pstats.exe', opts=['SUBSYSTEM:WINDOWS', 'WINCOMCTL', 'WINCOMDLG', 'WINSOCK', 'WINIMM', 'WINGDI', 'WINKERNEL', 'WINOLDNAMES', 'WINUSER', 'WINMM', 'UXTHEME', 'GTK3', 'COCOA', 'CARBON', 'QUARTZ'])
 
 #
 # DIRECTORY: pandatool/src/xfileprogs/
